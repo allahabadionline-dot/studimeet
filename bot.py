@@ -32,9 +32,10 @@ logger = logging.getLogger(__name__)
 CHOOSING_EXAM, ASKING_AGE, ASKING_GENDER, ASKING_LOCATION = range(4)
 
 # ==========================================
-# HELPER FUNCTIONS (Tags & Keyboards)
+# UI & TAG HELPERS
 # ==========================================
 def get_main_keyboard(is_premium=False):
+    """Generates the new 4x2 interactive toggle keyboard."""
     limit_text = "💡 Daily chat limit: Unlimited" if is_premium else "💡 Daily chat limit: 100"
     keyboard = [
         [KeyboardButton("💬 Chat"), KeyboardButton("🔄 Re-Chat")],
@@ -42,9 +43,11 @@ def get_main_keyboard(is_premium=False):
         [KeyboardButton("🎁 Send Gift"), KeyboardButton("ℹ️ About")],
         [KeyboardButton("❓ Help"), KeyboardButton(limit_text)]
     ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
+    # FIX: Removed is_persistent=True so it stops hijacking the back button
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 def get_or_create_tag(user_id, bot_data):
+    """Generates and retrieves a permanent 8-character ID for a user."""
     if 'tags' not in bot_data:
         bot_data['tags'] = {}
         
@@ -183,7 +186,6 @@ async def ask_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         "location": context.user_data.get("location")
     }
     
-    # Generate permanent TAG for new user
     my_tag = get_or_create_tag(user_id, context.bot_data)
     
     await context.bot.send_message(
@@ -330,15 +332,17 @@ async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if 'matches' in context.bot_data and user_id in context.bot_data['matches']:
         partner_id = context.bot_data['matches'][user_id]
+        
+        # Get tags for the exit cards
         partner_tag = get_or_create_tag(partner_id, context.bot_data)
+        my_tag = get_or_create_tag(user_id, context.bot_data)
         
         # Disconnect backend
         del context.bot_data['matches'][user_id]
         if partner_id in context.bot_data['matches']:
             del context.bot_data['matches'][partner_id]
             
-            # Notify Partner
-            my_tag = get_or_create_tag(user_id, context.bot_data)
+            # Send Beautiful Exit Card to Partner
             partner_exit_text = (
                 "🚫 *Your partner left the chat*\n\n"
                 "/chat - Find new partner\n"
@@ -353,7 +357,7 @@ async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             except Exception:
                 pass
                 
-        # Notify Self
+        # Send Beautiful Exit Card to Self
         self_exit_text = (
             "🚫 *You left the chat*\n\n"
             "/chat - Find new partner\n"
@@ -413,6 +417,11 @@ async def report_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     else:
         await update.message.reply_text("To report someone, use: `/report TAG`", parse_mode=ParseMode.MARKDOWN)
 
+async def report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer("Report Logged", show_alert=True)
+    await query.edit_message_reply_markup(reply_markup=None) 
+
 async def generic_text_responses(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cmd = update.message.text.lower()
     if "/rules" in cmd:
@@ -426,11 +435,6 @@ async def generic_text_responses(update: Update, context: ContextTypes.DEFAULT_T
     elif "/help" in cmd or "❓ help" in cmd:
         await update.message.reply_text("🛠 *Help Menu*\nUse `/chat` to find someone, and `/settings` to change your exam or location. To exit a chat safely, type `/exit`.")
 
-async def report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer("Report Logged", show_alert=True)
-    await query.edit_message_reply_markup(reply_markup=None) # Removes the button after clicking
-
 
 # ==========================================
 # 5. UNIVERSAL MESSAGE RELAY & INTERCEPTOR
@@ -438,7 +442,7 @@ async def report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def handle_general_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text
     user_id = update.effective_user.id
-    
+
     # Check if they tapped a Bottom Menu Button
     if text == "💬 Chat":
         await match_user(update, context)
@@ -518,12 +522,12 @@ def main():
 
     app.add_handler(conv_handler)
     
-    # Settings
+    # Standalone Settings Handlers
     app.add_handler(CommandHandler("settings", settings_command))
     app.add_handler(CallbackQueryHandler(settings_grid_callback, pattern="^set_edit_|^set_close"))
     app.add_handler(CallbackQueryHandler(settings_save_callback, pattern="^set_save_"))
     
-    # Interaction Commands
+    # Standard Commands
     app.add_handler(CommandHandler("chat", match_user))
     app.add_handler(CommandHandler("exit", stop_chat))
     app.add_handler(CommandHandler("rechat", rechat_command))
@@ -535,10 +539,10 @@ def main():
     app.add_handler(CallbackQueryHandler(report_callback, pattern="^rep_"))
     app.add_handler(CommandHandler(["rules", "paysupport", "privacy", "help", "about"], generic_text_responses))
     
-    # Universal Message Handler
+    # Universal Message Handler (MUST be last)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_general_messages))
 
-    print("StudiMeet Bot is running with the new V2 Interface...")
+    print("StudiMeet Bot is running with the new Interactive V2 Interface...")
     app.run_polling()
 
 if __name__ == "__main__":
