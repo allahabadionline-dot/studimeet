@@ -35,7 +35,7 @@ CHOOSING_EXAM, ASKING_AGE, ASKING_GENDER, ASKING_LOCATION = range(4)
 # UI & TAG HELPERS
 # ==========================================
 def get_main_keyboard(is_premium=False):
-    """Generates the new 4x2 interactive toggle keyboard."""
+    """Generates the new interactive toggle keyboard."""
     limit_text = "💡 Daily chat limit: Unlimited" if is_premium else "💡 Daily chat limit: 100"
     keyboard = [
         [KeyboardButton("💬 Chat"), KeyboardButton("🔄 Re-Chat")],
@@ -43,7 +43,7 @@ def get_main_keyboard(is_premium=False):
         [KeyboardButton("🎁 Send Gift"), KeyboardButton("ℹ️ About")],
         [KeyboardButton("❓ Help"), KeyboardButton(limit_text)]
     ]
-    # FIXED: is_persistent=False ensures the keyboard stays hidden when the user presses 'back'
+    # is_persistent=False ensures "back means back" (it stays hidden when QWERTY closes)
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=False)
 
 def get_or_create_tag(user_id, bot_data):
@@ -70,15 +70,8 @@ async def setup_commands(application):
         BotCommand("start", "Start the bot"),
         BotCommand("chat", "Find a partner"),
         BotCommand("exit", "Leave current chat"),
-        BotCommand("rechat", "Reconnect with last or specific partner 💎"),
         BotCommand("settings", "Manage profile"),
-        BotCommand("premium", "Premium features"),
-        BotCommand("delete", "Delete sent message 💎"),
-        BotCommand("report", "Report user"),
-        BotCommand("rules", "Community rules"),
-        BotCommand("paysupport", "Payment support"),
-        BotCommand("privacy", "Privacy policy"),
-        BotCommand("help", "Show help menu")
+        BotCommand("premium", "Premium features")
     ]
     await application.bot.set_my_commands(commands)
 
@@ -157,6 +150,12 @@ async def ask_gender(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         [InlineKeyboardButton("📍 Delhi", callback_data="loc_Delhi"), InlineKeyboardButton("📍 Prayagraj", callback_data="loc_Prayagraj")],
         [InlineKeyboardButton("📍 Kota", callback_data="loc_Kota"), InlineKeyboardButton("📍 Patna", callback_data="loc_Patna")],
         [InlineKeyboardButton("📍 Hyderabad", callback_data="loc_Hyderabad"), InlineKeyboardButton("📍 Bengaluru", callback_data="loc_Bengaluru")],
+        [InlineKeyboardButton("📍 Jaipur", callback_data="loc_Jaipur"), InlineKeyboardButton("📍 Lucknow", callback_data="loc_Lucknow")],
+        [InlineKeyboardButton("📍 Pune", callback_data="loc_Pune"), InlineKeyboardButton("📍 Chennai", callback_data="loc_Chennai")],
+        [InlineKeyboardButton("📍 Mumbai", callback_data="loc_Mumbai"), InlineKeyboardButton("📍 Kolkata", callback_data="loc_Kolkata")],
+        [InlineKeyboardButton("📍 Chandigarh", callback_data="loc_Chandigarh"), InlineKeyboardButton("📍 Indore", callback_data="loc_Indore")],
+        [InlineKeyboardButton("📍 Bhopal", callback_data="loc_Bhopal"), InlineKeyboardButton("📍 Ranchi", callback_data="loc_Ranchi")],
+        [InlineKeyboardButton("📍 Ahmedabad", callback_data="loc_Ahmedabad"), InlineKeyboardButton("📍 Guwahati", callback_data="loc_Guwahati")],
         [InlineKeyboardButton("✍️ Other / Type My City", callback_data="loc_OTHER")]
     ]
     await query.edit_message_text(f"✅ Selected: {context.user_data['gender']}\n\nLast question: Which city are you preparing from?", reply_markup=InlineKeyboardMarkup(city_buttons))
@@ -432,8 +431,18 @@ async def generic_text_responses(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("💳 *Support*\nFor payment issues, contact our admin team at @StudiMeetSupport.")
     elif "/about" in cmd or "ℹ️ about" in cmd:
         await update.message.reply_text("🎓 *StudiMeet*\nThe best anonymous peer-to-peer prep platform. Connect, chat, and crack it!")
-    elif "/help" in cmd or "❓ help" in cmd:
-        await update.message.reply_text("🛠 *Help Menu*\nUse `/chat` to find someone, and `/settings` to change your exam or location. To exit a chat safely, type `/exit`.")
+
+async def help_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    help_text = (
+        "/settings - Manage profile\n"
+        "/premium - Premium features\n"
+        "/rechat TAG - Reconnect with specific chat 💎\n"
+        "/delete - Delete sent message 💎\n"
+        "/rules - Community rules\n"
+        "/paysupport - Payment support\n"
+        "/privacy - Privacy policy"
+    )
+    await update.message.reply_text(help_text)
 
 
 # ==========================================
@@ -459,8 +468,11 @@ async def handle_general_messages(update: Update, context: ContextTypes.DEFAULT_
     elif text == "🎁 Send Gift":
         await send_gift(update, context)
         return
-    elif text in ["ℹ️ About", "❓ Help"]:
+    elif text == "ℹ️ About":
         await generic_text_responses(update, context)
+        return
+    elif text == "❓ Help":
+        await help_menu(update, context)
         return
     elif "Daily chat limit" in text:
         await update.message.reply_text("You have plenty of chats remaining today!")
@@ -537,7 +549,8 @@ def main():
     # Utility Commands
     app.add_handler(CommandHandler("report", report_user))
     app.add_handler(CallbackQueryHandler(report_callback, pattern="^rep_"))
-    app.add_handler(CommandHandler(["rules", "paysupport", "privacy", "help", "about"], generic_text_responses))
+    app.add_handler(CommandHandler("help", help_menu))
+    app.add_handler(CommandHandler(["rules", "paysupport", "privacy", "about"], generic_text_responses))
     
     # Universal Message Handler (MUST be last)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_general_messages))
