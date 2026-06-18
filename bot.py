@@ -43,8 +43,8 @@ def get_main_keyboard(is_premium=False):
         [KeyboardButton("🎁 Send Gift"), KeyboardButton("ℹ️ About")],
         [KeyboardButton("❓ Help"), KeyboardButton(limit_text)]
     ]
-    # FIX: Removed is_persistent=True so it stops hijacking the back button
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    # FIXED: is_persistent=False ensures the keyboard stays hidden when the user presses 'back'
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=False)
 
 def get_or_create_tag(user_id, bot_data):
     """Generates and retrieves a permanent 8-character ID for a user."""
